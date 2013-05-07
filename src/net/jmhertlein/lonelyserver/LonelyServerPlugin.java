@@ -123,15 +123,28 @@ public class LonelyServerPlugin extends JavaPlugin {
 
         FileConfiguration config = new YamlConfiguration();
         try {
-            getLogger().info("Lonely Server: Config loaded.");
+            getLogger().info("Config loaded.");
             config.load(new File(sourceDir, configFile));
             color = ChatColor.valueOf(config.getString("chatColor"));
+            timeThresholdHours = config.getLong("timeThresholdHours");
             messages = config.getStringList("messages");
             if (messages.isEmpty()){
-            	getLogger().severe("No messages found (bad yml formatting?) loaded default");
-            	messages.add("The last player only logged off $TIME ago.");
+            	//if the list is empty, something is wrong with the configuration, so lets try not to panic...
+            	if (config.isString("message")){
+            		getLogger().info("Found old message format, converting to StringList...");
+            		messages.add(config.getString("message"));
+            		config.set("message",null);//remove old message setting, use list now
+                    config.set("timeThresholdHours", timeThresholdHours);
+                    config.set("messages", messages);
+                    config.set("chatColor", color.name());
+                    persistConfig(config);
+            	}
+            	else{
+            		getLogger().severe("No messages found (bad yml formatting?) loaded default");
+            		messages.add("The last player only logged off $TIME ago.");
+            	}
             }
-            timeThresholdHours = config.getLong("timeThresholdHours");
+            
         } catch (FileNotFoundException ex) {
             //print license info on first run
             printLicenseInfo();
@@ -151,8 +164,9 @@ public class LonelyServerPlugin extends JavaPlugin {
             persistConfig(config);
         } catch (IOException | InvalidConfigurationException ex) {
             config.set("chatColor", color.toString());
-            getLogger().log(Level.SEVERE, "Lonely Server: Error loading config; probably bad markup in the file?");
+            getLogger().log(Level.SEVERE, "Error loading config; probably bad markup in the file?");
         }
+        getLogger().info(String.format("Configuration: loaded %d messages", messages.size()));
     }
 
     private void printLicenseInfo() {
@@ -163,9 +177,9 @@ public class LonelyServerPlugin extends JavaPlugin {
     private void persistConfig(FileConfiguration config) {
         try {
             config.save(new File(getDataFolder(), configFile));
-            getLogger().info("Lonely Server: Default config written.");
+            getLogger().info("Default config written.");
         } catch (IOException ex1) {
-            getLogger().severe("Lonely Server: Error writing default config");
+            getLogger().severe("Error writing default config");
         }
     }
 }
