@@ -17,6 +17,9 @@ package net.jmhertlein.lonelyserver;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 import java.util.logging.Level;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -41,12 +44,18 @@ public class LonelyServerPlugin extends JavaPlugin {
     private static long timeThresholdHours;
     private Player mostRecentLogoffPlayer;
     private long mostRecentLogoffTime;
-    private String message;
+    private List<String> messages;
+    private Random rand;
 
     @Override
     public void onEnable() {
         Bukkit.getServer().getPluginManager().registerEvents(new LogListener(), this);
+        rand = new Random();
         loadConfig();
+    }
+    @Override
+    public void onDisable(){
+    	rand = null; 
     }
 
     private class LogListener implements Listener {
@@ -97,7 +106,8 @@ public class LonelyServerPlugin extends JavaPlugin {
     }
 
     private String getLoginMessage(Player loginPlayer) {
-        String msg = message.replaceAll("$MINS", (new Long(getMinutesSinceLastLogoff())).toString());
+        String msg = messages.get(rand.nextInt(messages.size()));
+        msg = msg.replaceAll("$MINS", (new Long(getMinutesSinceLastLogoff())).toString());
         msg = msg.replace("$TIME", getFormattedTimeSinceLastLogoff());
         msg = msg.replace("$LASTPLAYER", mostRecentLogoffPlayer.getName());
         msg = msg.replace("$CURPLAYER", loginPlayer.getName());
@@ -116,7 +126,11 @@ public class LonelyServerPlugin extends JavaPlugin {
             getLogger().info("Lonely Server: Config loaded.");
             config.load(new File(sourceDir, configFile));
             color = ChatColor.valueOf(config.getString("chatColor"));
-            message = config.getString("message");
+            messages = config.getStringList("messages");
+            if (messages.isEmpty()){
+            	getLogger().severe("No messages found (bad yml formatting?) loaded default");
+            	messages.add("The last player only logged off $TIME ago.");
+            }
             timeThresholdHours = config.getLong("timeThresholdHours");
         } catch (FileNotFoundException ex) {
             //print license info on first run
@@ -124,12 +138,13 @@ public class LonelyServerPlugin extends JavaPlugin {
             
             //load defaults into RAM
             color = ChatColor.DARK_AQUA;
-            message = "The last player only logged off $TIME ago.";
+            messages = new ArrayList<String>();
+            messages.add("The last player only logged off $TIME ago."); 
             timeThresholdHours = 6;
 
             //set defaults in the config
             config.set("timeThresholdHours", timeThresholdHours);
-            config.set("message", message);
+            config.set("messages", messages);
             config.set("chatColor", color.name());
             
             //write config to file
