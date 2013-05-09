@@ -17,8 +17,10 @@ package net.jmhertlein.lonelyserver;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.InvalidConfigurationException;
@@ -37,18 +39,23 @@ import org.bukkit.plugin.java.JavaPlugin;
  */
 public class LonelyServerPlugin extends JavaPlugin {
 
-    private static final Logger mcLogger = Logger.getLogger("Minecraft");
     private static final String configFile = "config.yml";
     private static ChatColor color;
     private static long timeThresholdHours;
     private Player mostRecentLogoffPlayer;
     private long mostRecentLogoffTime;
-    private String message;
+    private List<String> messages;
+    private Random rand;
 
     @Override
     public void onEnable() {
         Bukkit.getServer().getPluginManager().registerEvents(new LogListener(), this);
+        rand = new Random();
         loadConfig();
+    }
+    @Override
+    public void onDisable(){
+    	rand = null; 
     }
 
     private class LogListener implements Listener {
@@ -65,7 +72,7 @@ public class LonelyServerPlugin extends JavaPlugin {
                     && getHoursSinceLastLogoff() < timeThresholdHours
                     ) {
                 e.getPlayer().sendMessage(color + getLoginMessage(e.getPlayer()));
-                mcLogger.log(Level.INFO, e.getPlayer().getName() + " logged in alone, and was notified that the last player only logged off " + getFormattedTimeSinceLastLogoff() + " ago.");
+                getLogger().info(e.getPlayer().getName() + " logged in alone, and was notified that the last player only logged off " + getFormattedTimeSinceLastLogoff() + " ago.");
             }
         }
     }
@@ -99,7 +106,8 @@ public class LonelyServerPlugin extends JavaPlugin {
     }
 
     private String getLoginMessage(Player loginPlayer) {
-        String msg = message.replaceAll("$MINS", (new Long(getMinutesSinceLastLogoff())).toString());
+        String msg = messages.get(rand.nextInt(messages.size()));
+        msg = msg.replaceAll("$MINS", (new Long(getMinutesSinceLastLogoff())).toString());
         msg = msg.replace("$TIME", getFormattedTimeSinceLastLogoff());
         msg = msg.replace("$LASTPLAYER", mostRecentLogoffPlayer.getName());
         msg = msg.replace("$CURPLAYER", loginPlayer.getName());
@@ -115,44 +123,63 @@ public class LonelyServerPlugin extends JavaPlugin {
 
         FileConfiguration config = new YamlConfiguration();
         try {
-            mcLogger.log(Level.INFO, "Lonely Server: Config loaded.");
+            getLogger().info("Config loaded.");
             config.load(new File(sourceDir, configFile));
             color = ChatColor.valueOf(config.getString("chatColor"));
-            message = config.getString("message");
             timeThresholdHours = config.getLong("timeThresholdHours");
+            messages = config.getStringList("messages");
+            if (messages.isEmpty()){
+            	//if the list is empty, something is wrong with the configuration, so lets try not to panic...
+            	if (config.isString("message")){
+            		getLogger().info("Found old message format, converting to StringList...");
+            		messages.add(config.getString("message"));
+            		config.set("message",null);//remove old message setting, use list now
+                    config.set("timeThresholdHours", timeThresholdHours);
+                    config.set("messages", messages);
+                    config.set("chatColor", color.name());
+                    persistConfig(config);
+            	}
+            	else{
+            		getLogger().severe("No messages found (bad yml formatting?) loaded default");
+            		messages.add("The last player only logged off $TIME ago.");
+            	}
+            }
+            
         } catch (FileNotFoundException ex) {
             //print license info on first run
             printLicenseInfo();
             
             //load defaults into RAM
             color = ChatColor.DARK_AQUA;
-            message = "The last player only logged off $TIME ago.";
+            messages = new ArrayList<String>();
+            messages.add("The last player only logged off $TIME ago."); 
             timeThresholdHours = 6;
 
             //set defaults in the config
             config.set("timeThresholdHours", timeThresholdHours);
-            config.set("message", message);
+            config.set("messages", messages);
             config.set("chatColor", color.name());
             
             //write config to file
             persistConfig(config);
         } catch (IOException | InvalidConfigurationException ex) {
             config.set("chatColor", color.toString());
-            mcLogger.log(Level.SEVERE, "Lonely Server: Error loading config; probably bad markup in the file?");
+            getLogger().log(Level.SEVERE, "Error loading config; probably bad markup in the file?");
         }
+        getLogger().info(String.format("Configuration: loaded %d messages", messages.size()));
     }
 
     private void printLicenseInfo() {
-        mcLogger.log(Level.INFO, "LonelyServer is free software. For more information, see http://www.gnu.org/licenses/quick-guide-gplv3.html and http://www.gnu.org/licenses/gpl.txt");
-        mcLogger.log(Level.INFO, "LonelyServer's source code is available as per its license here: https://github.com/jmhertlein/LonelyServer");
+        getLogger().info("LonelyServer is free software. For more information, see http://www.gnu.org/licenses/quick-guide-gplv3.html and http://www.gnu.org/licenses/gpl.txt");
+        getLogger().info("LonelyServer's source code is available as per its license here: https://github.com/jmhertlein/LonelyServer");
     }
 
     private void persistConfig(FileConfiguration config) {
         try {
             config.save(new File(getDataFolder(), configFile));
-            mcLogger.log(Level.INFO, "Lonely Server: Default config written.");
+            getLogger().info("Default config written.");
         } catch (IOException ex1) {
-            mcLogger.log(Level.SEVERE, "Lonely Server: Error writing default config");
+            getLogger().severe("Error writing default config");
         }
     }
 }
