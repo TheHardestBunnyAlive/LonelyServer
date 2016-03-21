@@ -67,7 +67,7 @@ public class LonelyServerPlugin extends JavaPlugin {
 
         @EventHandler
         public void onPlayerJoin(PlayerJoinEvent e) {
-            if (    Bukkit.getServer().getOnlinePlayers().length == 1 
+            if (    Bukkit.getServer().getOnlinePlayers().size() == 1 
                     && mostRecentLogoffPlayer != null 
                     && getHoursSinceLastLogoff() < timeThresholdHours
                     ) {
