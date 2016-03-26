@@ -1,0 +1,40 @@
+<project name="LonelyServer" default="dist" basedir=".">
+	<description>
+		Empty server helper
+	</description>
+
+	<property name="src" value="src" />
+	<property name="build" value="build" />
+	<property name="dist" value="dist" />
+
+	<property name="spigot" value="../lib/spigot.jar" />
+
+	<target name="clean"
+		description="Cleans the working directory from everything build related.">
+		<delete dir="${build}" />
+		<delete dir="${dist}" />
+	</target>
+	
+	<target name="init" depends="clean"
+		description="Sets up the current working directory.">
+		<mkdir dir="${build}" />
+		<mkdir dir="${dist}" />
+	</target>
+	
+	<target name="compile" depends="init"
+		description="Compiles all source files.">
+		<javac srcdir="${src}" destdir="${build}" 
+			includeantruntime="false"
+			classpath="${spigot}" />
+		<manifest file="MANIFEST.MF" />
+	</target>
+	
+	<target name="dist" depends="compile"
+		description="Creates the jar.">
+		<jar jarfile="${dist}/${ant.project.name}.jar" basedir="${build}"
+			manifest="MANIFEST.MF">
+			<zipfileset dir="${src}" includes="plugin.yml" />
+			<zipfileset dir="${src}" includes="COPYING.txt" />
+		</jar>
+	</target>
+</project>
